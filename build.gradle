@@ -1,0 +1,77 @@
+plugins {
+    id 'java'
+    id 'war'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'org.flywaydb.flyway' version '10.10.0'
+}
+
+group = 'ru.itmo'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations.configureEach {
+    exclude group: 'org.hibernate.orm', module: 'hibernate-core'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.eclipse.persistence:org.eclipse.persistence.jpa:4.0.4'
+
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-database-postgresql'
+    // Драйвер нужен для локального запуска и тестов; на сервере приложений используется драйвер сервера
+    runtimeOnly 'org.postgresql:postgresql'
+    // Встроенный Tomcat не попадает в развёртываемый war (на сервере свой контейнер сервлетов)
+    providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.zonky.test:embedded-postgres:2.0.7'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+processResources {
+    from('frontend/dist') {
+        into 'static'
+    }
+}
+
+bootTestRun {
+    mainClass = 'ru.itmo.lab1.DevServer'
+}
+
+// study-groups.war — для развёртывания на сервере приложений (WildFly / Tomcat)
+war {
+    archiveFileName = 'study-groups.war'
+    enabled = true
+    // Драйвер БД предоставляет сервер приложений вместе с DataSource.
+    // Logback исключён: на WildFly SLF4J уже привязан к JBoss LogManager, и Spring Boot
+    // с Logback в war падает при старте; логи приложения идут в server.log
+    classpath = classpath.filter {
+        !it.name.startsWith('postgresql-') && !it.name.startsWith('logback-') && !it.name.startsWith('jul-to-slf4j-')
+    }
+}
+
+// Исполняемый вариант (java -jar) для локальной отладки
+bootWar {
+    archiveFileName = 'study-groups-boot.war'
+}
